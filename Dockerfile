@@ -1,12 +1,17 @@
-# Imagem de Origem
-FROM node:13-alpine
-# Diretório de trabalho(é onde a aplicação ficará dentro do container).
+# build environment
+FROM node:14-alpine as react-build
 WORKDIR /app
-# Adicionando `/app/node_modules/.bin` para o $PATH
-ENV PATH /app/node_modules/.bin:$PATH
-# Instalando dependências da aplicação e armazenando em cache.
-COPY package.json /app/package.json
-RUN npm install --silent
-RUN npm install react-scripts@3.3.1 -g --silent
-# Inicializa a aplicação
-CMD ["npm", "start"]
+COPY . ./
+RUN yarn
+RUN yarn build
+
+# server environment
+FROM nginx:alpine
+COPY nginx.conf /etc/nginx/conf.d/configfile.template
+
+COPY --from=react-build /app/build /usr/share/nginx/html
+
+ENV PORT 8080
+ENV HOST 0.0.0.0
+EXPOSE 8080
+CMD sh -c "envsubst '\$PORT' < /etc/nginx/conf.d/configfile.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"
